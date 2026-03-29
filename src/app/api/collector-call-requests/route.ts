@@ -33,7 +33,7 @@ export async function GET() {
     });
 
     return NextResponse.json({
-      requests: requests.map((r) => ({
+      requests: requests.map((r: any) => ({
         id: r.id,
         subscriber_name: r.subscriber.name,
         subscriber_serial: r.subscriber.serial_number,
