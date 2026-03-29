@@ -1,0 +1,1156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CompanyRole {
+  super_admin
+  sales
+  support
+  accountant
+}
+
+enum StaffRole {
+  accountant
+  collector
+  operator
+  cashier
+}
+
+enum PlanType {
+  trial
+  basic
+  gold
+  fleet
+  custom
+}
+
+enum ModuleKey {
+  subscriber_management
+  basic_invoicing
+  pos
+  reports
+  wallet
+  whatsapp
+  engine_tracking
+  daily_brief
+  subscriber_app
+  ai_reports
+  multi_branch
+  gps
+  iot_monitoring
+  fuel_sensor
+  temperature_sensor
+  operator_app
+}
+
+// ─── AMPER INTERNAL ─────────────────────────────────────────
+
+model CompanyUser {
+  id         String      @id @default(uuid())
+  email      String      @unique
+  password   String
+  name       String
+  role       CompanyRole @default(support)
+  is_active  Boolean     @default(true)
+  created_at DateTime    @default(now())
+  updated_at DateTime    @updatedAt
+  @@map("company_users")
+}
+
+model Tenant {
+  id                    String                @id @default(uuid())
+  name                  String
+  owner_name            String
+  phone                 String                @unique
+  email                 String?               @unique
+  password              String
+  plan                  PlanType              @default(basic)
+  is_active             Boolean               @default(true)
+  is_trial              Boolean               @default(false)
+  trial_ends_at         DateTime?
+  trial_subscriber_limit Int                  @default(20)
+  subscription_ends_at  DateTime?
+  grace_period_ends_at  DateTime?
+  is_in_grace_period    Boolean               @default(false)
+  locked_at             DateTime?
+  custom_max_generators Int?
+  custom_max_subscribers Int?
+  app_access_code       String?               @unique
+  created_at            DateTime              @default(now())
+  updated_at            DateTime              @updatedAt
+  modules               TenantModule[]
+  billing_invoices      BillingInvoice[]
+  payments              Payment[]
+  support_tickets       SupportTicket[]
+  branches              Branch[]
+  staff                 Staff[]
+  subscribers           Subscriber[]
+  online_payments       OnlinePayment[]
+  subscriber_app_settings SubscriberAppSettings[]
+  pos_devices           PosDevice[]
+  discounts             TenantDiscount[]
+  @@map("tenants")
+}
+
+model TenantModule {
+  id                String    @id @default(uuid())
+  tenant_id         String
+  module_key        ModuleKey
+  is_active         Boolean   @default(true)
+  add_on_price      Decimal?  @db.Decimal(12,2)
+  added_outside_plan Boolean  @default(false)
+  activated_at      DateTime  @default(now())
+  deactivated_at    DateTime?
+  tenant            Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  @@unique([tenant_id, module_key])
+  @@map("tenant_modules")
+}
+
+model BillingInvoice {
+  id              String    @id @default(uuid())
+  tenant_id       String
+  amount          Decimal   @db.Decimal(12,2)
+  discount_amount Decimal   @default(0) @db.Decimal(12,2)
+  final_amount    Decimal   @db.Decimal(12,2)
+  discount_id     String?
+  plan            PlanType
+  period_start    DateTime
+  period_end      DateTime
+  is_paid         Boolean   @default(false)
+  paid_at         DateTime?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  tenant          Tenant    @relation(fields: [tenant_id], references: [id])
+  @@index([tenant_id, is_paid])
+  @@map("billing_invoices")
+}
+
+model Payment {
+  id           String   @id @default(uuid())
+  tenant_id    String
+  invoice_id   String?
+  amount       Decimal  @db.Decimal(12,2)
+  method       String
+  reference    String?
+  notes        String?
+  recorded_by  String?
+  created_at   DateTime @default(now())
+  tenant       Tenant   @relation(fields: [tenant_id], references: [id])
+  @@map("payments")
+}
+
+model SupportTicket {
+  id          String        @id @default(uuid())
+  tenant_id   String?
+  title       String
+  body        String
+  status      String        @default("open")
+  priority    String        @default("normal")
+  assigned_to String?
+  created_at  DateTime      @default(now())
+  updated_at  DateTime      @updatedAt
+  tenant      Tenant?       @relation(fields: [tenant_id], references: [id])
+  replies     TicketReply[]
+  @@map("support_tickets")
+}
+
+model TicketReply {
+  id         String        @id @default(uuid())
+  ticket_id  String
+  author_id  String
+  author_type String
+  body       String
+  created_at DateTime      @default(now())
+  ticket     SupportTicket @relation(fields: [ticket_id], references: [id])
+  @@map("ticket_replies")
+}
+
+model StoreProduct {
+  id            String       @id @default(uuid())
+  name_ar       String
+  name_en       String?
+  description   String?
+  price_usd     Decimal      @db.Decimal(10,2)
+  category      String
+  stock         Int          @default(0)
+  is_active     Boolean      @default(true)
+  sort_order    Int          @default(0)
+  discount_pct  Decimal?     @db.Decimal(5,2)
+  discount_ends_at DateTime?
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+  orders        StoreOrder[]
+  @@map("store_products")
+}
+
+model StoreOrder {
+  id          String       @id @default(uuid())
+  product_id  String
+  tenant_id   String?
+  name        String
+  phone       String
+  governorate String?
+  notes       String?
+  status      String       @default("pending")
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  product     StoreProduct @relation(fields: [product_id], references: [id])
+  @@index([status, created_at])
+  @@map("store_orders")
+}
+
+model TrialRequest {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String
+  governorate String?
+  generator_count Int  @default(1)
+  notes       String?
+  status      String   @default("new")
+  contacted_at DateTime?
+  created_at  DateTime @default(now())
+  @@map("trial_requests")
+}
+
+model PlanChangeLog {
+  id          String   @id @default(uuid())
+  tenant_id   String
+  changed_by  String
+  change_type String
+  from_plan   PlanType?
+  to_plan     PlanType?
+  notes       String?
+  created_at  DateTime @default(now())
+  @@index([tenant_id, created_at])
+  @@map("plan_change_logs")
+}
+
+// ─── BRANCH & GENERATOR ──────────────────────────────────────
+
+model Branch {
+  id           String   @id @default(uuid())
+  tenant_id    String
+  name         String
+  address      String?
+  governorate  String?
+  province_key String?
+  district_key String?
+  whatsapp_number String?
+  gps_lat      Decimal?  @db.Decimal(10,8)
+  gps_lng      Decimal?  @db.Decimal(11,8)
+  furatpay_merchant_id      String?
+  furatpay_api_key          String?
+  furatpay_secret_key       String?
+  furatpay_is_sandbox       Boolean  @default(true)
+  aps_merchant_id           String?
+  aps_access_code           String?
+  aps_sha_request_phrase    String?
+  aps_sha_response_phrase   String?
+  aps_is_sandbox            Boolean  @default(true)
+  aps_enabled               Boolean  @default(false)
+  active_gateway            String   @default("none")
+  is_online_payment_enabled Boolean  @default(false)
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  tenant       Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  generators         Generator[]
+  staff              Staff[]
+  subscribers        Subscriber[]
+  invoices           Invoice[]
+  expenses           Expense[]
+  operation_logs     OperationLog[]
+  normal_cut_logs    NormalCutLog[]
+  notifications      Notification[]
+  delivery_records   DeliveryRecord[]
+  monthly_pricing    MonthlyPricing[]
+  offline_queue      OfflineSyncQueue[]
+  loss_reports       LossReport[]
+  marketing_messages MarketingMessage[]
+  upgrade_requests   UpgradeRequest[]
+  meter_readings     MeterReading[]
+  collector_reports  CollectorDailyReport[]
+  pos_devices        PosDevice[]
+  ai_reports         AiReport[]
+  operator_shifts    OperatorShift[]
+  collector_shifts   CollectorShift[]
+  gps_logs           StaffGpsLog[]
+  subscriber_discounts SubscriberDiscount[]
+  collector_discount_requests CollectorDiscountRequest[]
+  alleys             Alley[]
+  @@index([tenant_id, is_active])
+  @@map("branches")
+}
+
+model Generator {
+  id                    String    @id @default(uuid())
+  branch_id             String
+  name                  String
+  is_active             Boolean   @default(true)
+  run_status            Boolean   @default(false)
+  manual_override_allowed Boolean @default(false)
+  owner_is_collector    Boolean   @default(false)
+  fuel_level_pct        Float?
+  tank_full_dist_cm     Float?
+  tank_empty_dist_cm    Float?
+  last_fuel_update      DateTime?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  branch                Branch    @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+  engines               Engine[]
+  subscribers           Subscriber[]
+  iot_devices           IotDevice[]
+  manual_overrides      ManualOverrideLog[]
+  raspberry_devices     RaspberryDevice[]
+  subscriber_app_settings SubscriberAppSettings?
+  operator_shifts       OperatorShift[]
+  operator_schedules    OperatorSchedule[]
+  @@index([branch_id])
+  @@map("generators")
+}
+
+model Engine {
+  id                  String    @id @default(uuid())
+  generator_id        String
+  name                String
+  model               String?
+  oil_change_hours    Int       @default(250)
+  runtime_hours       Decimal   @default(0) @db.Decimal(10,2)
+  last_oil_change_at  DateTime?
+  ds18b20_address     String?
+  gold_ct_pin         Int?
+  normal_ct_pin       Int?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  generator           Generator @relation(fields: [generator_id], references: [id], onDelete: Cascade)
+  fuel_logs           FuelLog[]
+  temperature_logs    TemperatureLog[]
+  @@map("engines")
+}
+
+// ─── SUBSCRIBER ───────────────────────────────────────────────
+
+model Alley {
+  id          String   @id @default(uuid())
+  branch_id   String
+  tenant_id   String
+  name        String
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  branch      Branch   @relation(fields: [branch_id], references: [id], onDelete: Cascade)
+  subscribers Subscriber[]
+  @@unique([branch_id, name])
+  @@index([branch_id, sort_order])
+  @@map("alleys")
+}
+
+model Subscriber {
+  id                  String    @id @default(uuid())
+  branch_id           String
+  generator_id        String
+  tenant_id           String
+  serial_number       String
+  name                String
+  phone               String?
+  address             String?
+  alley               String?
+  alley_id            String?
+  governorate         String?
+  province_key        String?
+  district_key        String?
+  amperage            Decimal   @db.Decimal(8,2)
+  subscription_type   String    @default("normal")
+  total_debt          Decimal   @default(0) @db.Decimal(12,2)
+  access_code         String?   @unique
+  needs_attention     Boolean   @default(false)
+  is_active           Boolean   @default(true)
+  deleted_at          DateTime?
+  notes               String?
+  gps_lat             Decimal?  @db.Decimal(10,8)
+  gps_lng             Decimal?  @db.Decimal(11,8)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  branch              Branch    @relation(fields: [branch_id], references: [id])
+  generator           Generator @relation(fields: [generator_id], references: [id])
+  tenant              Tenant    @relation(fields: [tenant_id], references: [id])
+  alley_ref           Alley?    @relation(fields: [alley_id], references: [id])
+  invoices            Invoice[]
+  meter_readings      MeterReading[]
+  pos_transactions    PosTransaction[]
+  discounts           SubscriberDiscount[]
+  discount_requests   CollectorDiscountRequest[]
+  collector_call_requests CollectorCallRequest[]
+  @@unique([branch_id, serial_number])
+  @@index([tenant_id, is_active])
+  @@index([alley_id])
+  @@map("subscribers")
+}
+
+model MonthlyPricing {
+  id                  String   @id @default(uuid())
+  branch_id           String
+  billing_type        String   @default("fixed")
+  price_per_amp_normal Decimal @db.Decimal(10,2)
+  price_per_amp_gold  Decimal  @db.Decimal(10,2)
+  hourly_rate_normal  Decimal? @db.Decimal(10,4)
+  hourly_rate_gold    Decimal? @db.Decimal(10,4)
+  billing_mode        String   @default("prepaid")
+  effective_from      DateTime @default(now())
+  created_at          DateTime @default(now())
+  branch              Branch   @relation(fields: [branch_id], references: [id])
+  @@index([branch_id, effective_from])
+  @@map("monthly_pricing")
+}
+
+model Invoice {
+  id               String   @id @default(uuid())
+  subscriber_id    String
+  branch_id        String
+  tenant_id        String
+  billing_month    Int
+  billing_year     Int
+  base_amount      Decimal  @default(0) @db.Decimal(12,2)
+  discount_amount  Decimal  @default(0) @db.Decimal(12,2)
+  discount_type    String?
+  discount_value   Decimal? @db.Decimal(10,2)
+  discount_reason  String?
+  total_amount_due Decimal  @db.Decimal(12,2)
+  amount_paid      Decimal  @default(0) @db.Decimal(12,2)
+  previous_debt    Decimal  @default(0) @db.Decimal(12,2)
+  is_fully_paid    Boolean  @default(false)
+  payment_method   String?
+  online_payment_id String?
+  collector_id     String?
+  received_by_owner Boolean @default(false)
+  device_id        String?
+  notes            String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+  updated_by       String?
+  subscriber       Subscriber @relation(fields: [subscriber_id], references: [id], onDelete: Restrict)
+  branch           Branch   @relation(fields: [branch_id], references: [id])
+  @@unique([subscriber_id, billing_month, billing_year])
+  @@index([branch_id, billing_month, billing_year])
+  @@index([is_fully_paid, branch_id])
+  @@map("invoices")
+}
+
+model MeterReading {
+  id            String   @id @default(uuid())
+  subscriber_id String
+  branch_id     String
+  staff_id      String?
+  reading_value Decimal  @db.Decimal(12,2)
+  previous_reading Decimal @default(0) @db.Decimal(12,2)
+  units_consumed Decimal @default(0) @db.Decimal(12,2)
+  reading_date  DateTime @default(now())
+  notes         String?
+  subscriber    Subscriber @relation(fields: [subscriber_id], references: [id])
+  branch        Branch   @relation(fields: [branch_id], references: [id])
+  @@index([subscriber_id, reading_date])
+  @@map("meter_readings")
+}
+
+// ─── STAFF ───────────────────────────────────────────────────
+
+model Staff {
+  id              String              @id @default(uuid())
+  generator_id    String?
+  branch_id       String
+  tenant_id       String
+  name            String
+  role            StaffRole
+  phone           String?
+  email           String?
+  pin             String?
+  password        String?
+  is_active       Boolean             @default(true)
+  is_owner_acting Boolean             @default(false)
+  can_collect     Boolean             @default(false)
+  can_operate     Boolean             @default(false)
+  photo_url       String?
+  device_id       String?
+  created_at      DateTime            @default(now())
+  updated_at      DateTime            @updatedAt
+  updated_by      String?
+  branch          Branch              @relation(fields: [branch_id], references: [id])
+  tenant          Tenant              @relation(fields: [tenant_id], references: [id])
+  branch_access         StaffBranchAccess[]
+  daily_reports         CollectorDailyReport[]
+  pos_devices           PosDevice[]
+  pos_transactions      PosTransaction[]
+  operator_shifts       OperatorShift[]
+  operator_schedules    OperatorSchedule[]
+  operator_permission   OperatorPermission?
+  collector_shifts      CollectorShift[]
+  collector_permission  CollectorPermission?
+  gps_logs              StaffGpsLog[]
+  discount_requests     CollectorDiscountRequest[]
+  @@unique([phone, tenant_id])
+  @@index([branch_id, role])
+  @@map("staff")
+}
+
+model StaffBranchAccess {
+  id         String  @id @default(uuid())
+  staff_id   String
+  branch_id  String
+  can_edit   Boolean @default(false)
+  staff      Staff   @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+  @@unique([staff_id, branch_id])
+  @@map("staff_branch_access")
+}
+
+model CollectorWallet {
+  id              String   @id @default(uuid())
+  staff_id        String   @unique
+  branch_id       String
+  tenant_id       String
+  total_collected Decimal  @default(0) @db.Decimal(12,2)
+  total_delivered Decimal  @default(0) @db.Decimal(12,2)
+  balance         Decimal  @default(0) @db.Decimal(12,2)
+  last_updated    DateTime @default(now())
+  @@map("collector_wallets")
+}
+
+model DeliveryRecord {
+  id                String    @id @default(uuid())
+  branch_id         String
+  from_staff_id     String
+  to_staff_id       String?
+  tenant_id         String?
+  received_by_owner Boolean   @default(false)
+  amount            Decimal   @db.Decimal(12,2)
+  payment_type      String    @default("cash")
+  notes             String?
+  is_confirmed      Boolean   @default(false)
+  confirmed_at      DateTime?
+  confirmed_by      String?
+  delivered_at      DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  device_id         String?
+  branch            Branch    @relation(fields: [branch_id], references: [id])
+  @@index([branch_id, from_staff_id])
+  @@index([from_staff_id, delivered_at])
+  @@map("delivery_records")
+}
+
+// ─── IOT ─────────────────────────────────────────────────────
+
+model IotDevice {
+  id           String    @id @default(uuid())
+  generator_id String
+  device_token String    @unique @default(uuid())
+  device_type  String    @default("esp32")
+  is_online    Boolean   @default(false)
+  last_seen    DateTime?
+  firmware     String?
+  created_at   DateTime  @default(now())
+  generator    Generator @relation(fields: [generator_id], references: [id])
+  @@map("iot_devices")
+}
+
+model FuelLog {
+  id                  String   @id @default(uuid())
+  engine_id           String
+  fuel_level_percent  Float
+  distance_cm         Float?
+  fuel_added_liters   Float?
+  source              String   @default("iot")
+  cost_iqd            Decimal? @db.Decimal(12,2)
+  notes               String?
+  logged_at           DateTime @default(now())
+  engine              Engine   @relation(fields: [engine_id], references: [id])
+  @@index([engine_id, logged_at])
+  @@map("fuel_logs")
+}
+
+model TemperatureLog {
+  id          String   @id @default(uuid())
+  engine_id   String
+  temp_celsius Float
+  logged_at   DateTime @default(now())
+  engine      Engine   @relation(fields: [engine_id], references: [id])
+  @@index([engine_id, logged_at])
+  @@map("temperature_logs")
+}
+
+model RaspberryDevice {
+  id           String    @id @default(uuid())
+  generator_id String
+  device_token String    @unique @default(uuid())
+  screen_size  String    @default("4inch")
+  is_online    Boolean   @default(false)
+  last_seen    DateTime?
+  app_version  String?
+  created_at   DateTime  @default(now())
+  generator    Generator @relation(fields: [generator_id], references: [id])
+  @@map("raspberry_devices")
+}
+
+// ─── OPERATIONS ──────────────────────────────────────────────
+
+model OperationLog {
+  id           String   @id @default(uuid())
+  branch_id    String
+  engine_id    String?
+  staff_id     String?
+  action       String
+  notes        String?
+  created_at   DateTime @default(now())
+  branch       Branch   @relation(fields: [branch_id], references: [id])
+  @@index([branch_id, created_at])
+  @@map("operation_logs")
+}
+
+model NormalCutLog {
+  id           String   @id @default(uuid())
+  branch_id    String
+  generator_id String?
+  cut_start    DateTime
+  cut_end      DateTime?
+  duration_min Int?
+  source       String   @default("iot")
+  notes        String?
+  branch       Branch   @relation(fields: [branch_id], references: [id])
+  @@index([branch_id, cut_start])
+  @@map("normal_cut_logs")
+}
+
+model ManualOverrideLog {
+  id           String    @id @default(uuid())
+  generator_id String
+  activated_by String
+  activated_at DateTime  @default(now())
+  expires_at   DateTime
+  deactivated_at DateTime?
+  reason       String?
+  generator    Generator @relation(fields: [generator_id], references: [id])
+  @@map("manual_override_logs")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  branch_id   String
+  staff_id    String?
+  category    String
+  amount      Decimal  @db.Decimal(12,2)
+  description String?
+  receipt_url String?
+  created_at  DateTime @default(now())
+  branch      Branch   @relation(fields: [branch_id], references: [id])
+  @@index([branch_id, created_at])
+  @@map("expenses")
+}
+
+model LossReport {
+  id          String   @id @default(uuid())
+  branch_id   String
+  reported_by String?
+  amount      Decimal  @db.Decimal(12,2)
+  reason      String?
+  created_at  DateTime @default(now())
+  branch      Branch   @relation(fields: [branch_id], references: [id])
+  @@map("loss_reports")
+}
+
+// ─── NOTIFICATIONS & SYNC ────────────────────────────────────
+
+model Notification {
+  id          String   @id @default(uuid())
+  branch_id   String
+  tenant_id   String
+  type        String
+  title       String?
+  body        String
+  is_read     Boolean  @default(false)
+  payload     Json?
+  created_at  DateTime @default(now())
+  branch      Branch   @relation(fields: [branch_id], references: [id])
+  @@index([branch_id, is_read])
+  @@map("notifications")
+}
+
+model MarketingMessage {
+  id          String   @id @default(uuid())
+  branch_id   String
+  body        String
+  sent_at     DateTime?
+  is_sent     Boolean  @default(false)
+  recipient_count Int  @default(0)
+  created_at  DateTime @default(now())
+  branch      Branch   @relation(fields: [branch_id], references: [id])
+  @@map("marketing_messages")
+}
+
+model UpgradeRequest {
+  id           String    @id @default(uuid())
+  subscriber_id String
+  branch_id    String
+  from_type    String
+  to_type      String
+  requested_by String    @default("subscriber")
+  status       String    @default("pending")
+  completed_at DateTime?
+  created_at   DateTime  @default(now())
+  branch       Branch    @relation(fields: [branch_id], references: [id])
+  @@index([branch_id, status])
+  @@map("upgrade_requests")
+}
+
+model UpsellTrigger {
+  id            String   @id @default(uuid())
+  subscriber_id String
+  branch_id     String
+  trigger_type  String
+  shown_at      DateTime @default(now())
+  acted_on      Boolean  @default(false)
+  @@map("upsell_triggers")
+}
+
+model OfflineSyncQueue {
+  id           String   @id @default(uuid())
+  branch_id    String
+  device_id    String?
+  action_type  String
+  payload      Json
+  client_uuid  String   @unique
+  status       String   @default("pending")
+  retries      Int      @default(0)
+  error        String?
+  synced_at    DateTime?
+  created_at   DateTime @default(now())
+  branch       Branch   @relation(fields: [branch_id], references: [id])
+  @@index([status, created_at])
+  @@map("offline_sync_queue")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  tenant_id   String?
+  branch_id   String?
+  actor_id    String?
+  actor_type  String?
+  action      String
+  entity_type String?
+  entity_id   String?
+  old_value   Json?
+  new_value   Json?
+  ip_address  String?
+  user_agent  String?
+  created_at  DateTime @default(now())
+  @@index([tenant_id, created_at])
+  @@index([entity_type, entity_id])
+  @@map("audit_logs")
+}
+
+model GpsLog {
+  id          String   @id @default(uuid())
+  tenant_id   String
+  branch_id   String?
+  device_id   String?
+  lat         Decimal  @db.Decimal(10,8)
+  lng         Decimal  @db.Decimal(11,8)
+  accuracy_m  Float?
+  logged_at   DateTime @default(now())
+  @@index([tenant_id, logged_at])
+  @@map("gps_logs")
+}
+
+// ─── ONLINE PAYMENTS ─────────────────────────────────────────
+
+model OnlinePayment {
+  id              String   @id @default(uuid())
+  tenant_id       String
+  subscriber_id   String?
+  invoice_id      String?
+  amount          Decimal  @db.Decimal(12,2)
+  gateway         String
+  gateway_ref     String?
+  status          String   @default("pending")
+  fee_amount         Decimal  @default(0) @db.Decimal(10,2)
+  commission_rate    Decimal  @default(0.01) @db.Decimal(5,4)
+  commission_amount  Decimal? @db.Decimal(12,2)
+  gateway_fee        Decimal? @db.Decimal(10,2)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  tenant          Tenant   @relation(fields: [tenant_id], references: [id])
+  @@index([tenant_id, status])
+  @@map("online_payments")
+}
+
+model SubscriberPublicToken {
+  id            String   @id @default(uuid())
+  subscriber_id String   @unique
+  token         String   @unique @default(uuid())
+  expires_at    DateTime?
+  created_at    DateTime @default(now())
+  @@map("subscriber_public_tokens")
+}
+
+model SubscriberAppSettings {
+  id              String   @id @default(uuid())
+  generator_id    String   @unique
+  tenant_id       String
+  is_active       Boolean  @default(true)
+  welcome_message String?
+  primary_color   String   @default("#1B4FD8")
+  logo_url        String?
+  furatpay_enabled  Boolean @default(false)
+  collector_call_enabled Boolean @default(true)
+  marketing_message    String?
+  report_target_phone String?
+  report_recipient    String  @default("owner")
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+  generator        Generator @relation(fields: [generator_id], references: [id])
+  tenant           Tenant   @relation(fields: [tenant_id], references: [id])
+  @@map("subscriber_app_settings")
+}
+
+model CollectorCallRequest {
+  id            String    @id @default(uuid())
+  subscriber_id String
+  branch_id     String
+  requested_at  DateTime  @default(now())
+  resolved_at   DateTime?
+  status        String    @default("pending")
+  subscriber    Subscriber @relation(fields: [subscriber_id], references: [id])
+  @@index([branch_id, status])
+  @@map("collector_call_requests")
+}
+
+// ─── POS DEVICES ─────────────────────────────────────────────
+
+model PosDevice {
+  id                String    @id @default(uuid())
+  staff_id          String?
+  branch_id         String
+  tenant_id         String
+  serial_number     String    @unique
+  model             String    @default("Sunmi V2 Pro")
+  status            String    @default("active")
+  gateway_type      String?
+  gateway_merchant_id String?
+  gateway_terminal_id String?
+  receipt_header    String?
+  print_logo        Boolean   @default(true)
+  last_seen         DateTime?
+  app_version       String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  staff             Staff?    @relation(fields: [staff_id], references: [id])
+  branch            Branch    @relation(fields: [branch_id], references: [id])
+  tenant            Tenant    @relation(fields: [tenant_id], references: [id])
+  transactions      PosTransaction[]
+  @@index([branch_id, tenant_id])
+  @@map("pos_devices")
+}
+
+model PosTransaction {
+  id              String    @id @default(uuid())
+  device_id       String
+  invoice_id      String?
+  subscriber_id   String
+  staff_id        String
+  branch_id       String
+  tenant_id       String
+  amount          Decimal   @db.Decimal(12,2)
+  payment_method  String
+  gateway_tran_id String?
+  card_last4      String?
+  card_type       String?
+  status          String    @default("success")
+  receipt_printed Boolean   @default(false)
+  receipt_json    Json?
+  created_at      DateTime  @default(now())
+  device          PosDevice @relation(fields: [device_id], references: [id])
+  subscriber      Subscriber @relation(fields: [subscriber_id], references: [id])
+  staff           Staff     @relation(fields: [staff_id], references: [id])
+  @@index([device_id, created_at])
+  @@index([staff_id, created_at])
+  @@index([branch_id, created_at])
+  @@map("pos_transactions")
+}
+
+// ─── COLLECTOR TRACKING ──────────────────────────────────────
+
+model CollectorDailyReport {
+  id                    String   @id @default(uuid())
+  staff_id              String
+  branch_id             String
+  tenant_id             String
+  report_date           DateTime @db.Date
+  total_cash            Decimal  @default(0) @db.Decimal(12,2)
+  total_card            Decimal  @default(0) @db.Decimal(12,2)
+  total_electronic      Decimal  @default(0) @db.Decimal(12,2)
+  total_collected       Decimal  @default(0) @db.Decimal(12,2)
+  total_remaining_debt  Decimal  @default(0) @db.Decimal(12,2)
+  invoices_count        Int      @default(0)
+  subscribers_visited   Int      @default(0)
+  whatsapp_sent         Boolean  @default(false)
+  whatsapp_sent_at      DateTime?
+  sent_to_phone         String?
+  report_json           Json?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+  staff                 Staff    @relation(fields: [staff_id], references: [id])
+  branch                Branch   @relation(fields: [branch_id], references: [id])
+  @@unique([staff_id, report_date])
+  @@index([branch_id, report_date])
+  @@map("collector_daily_reports")
+}
+
+model CollectorShift {
+  id                   String    @id @default(uuid())
+  staff_id             String
+  branch_id            String
+  tenant_id            String
+  shift_date           DateTime  @db.Date
+  check_in_at          DateTime?
+  check_in_lat         Decimal?  @db.Decimal(10,8)
+  check_in_lng         Decimal?  @db.Decimal(11,8)
+  check_in_selfie      String?
+  check_in_valid       Boolean   @default(false)
+  check_out_at         DateTime?
+  check_out_selfie     String?
+  hours_worked         Decimal?  @db.Decimal(5,2)
+  status               String    @default("expected")
+  target_subscribers   Int       @default(0)
+  visited_subscribers  Int       @default(0)
+  collected_cash       Decimal   @default(0) @db.Decimal(12,2)
+  collected_electronic Decimal   @default(0) @db.Decimal(12,2)
+  target_reached       Boolean   @default(false)
+  alert_sent           Boolean   @default(false)
+  late_minutes         Int       @default(0)
+  notes                String?
+  created_at           DateTime  @default(now())
+  staff                Staff     @relation(fields: [staff_id], references: [id])
+  branch               Branch    @relation(fields: [branch_id], references: [id])
+  @@unique([staff_id, shift_date])
+  @@index([branch_id, shift_date])
+  @@map("collector_shifts")
+}
+
+model CollectorPermission {
+  id                        String   @id @default(uuid())
+  staff_id                  String   @unique
+  tenant_id                 String
+  geofence_radius_m         Int      @default(2000)
+  require_shift_checkin     Boolean  @default(false)
+  track_gps_interval_min    Int      @default(5)
+  daily_target              Int      @default(0)
+  alert_if_target_not_reached Boolean @default(true)
+  alert_threshold_pct       Int      @default(70)
+  fraud_detection           Boolean  @default(true)
+  can_give_discount         Boolean  @default(false)
+  discount_max_amount       Decimal  @default(0) @db.Decimal(12,2)
+  discount_timeout_min      Int      @default(15)
+  shift_start_time          String?
+  shift_end_time            String?
+  created_at                DateTime @default(now())
+  updated_at                DateTime @updatedAt
+  staff                     Staff    @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+  @@map("collector_permissions")
+}
+
+model StaffGpsLog {
+  id          String   @id @default(uuid())
+  staff_id    String
+  branch_id   String
+  tenant_id   String
+  lat         Decimal  @db.Decimal(10,8)
+  lng         Decimal  @db.Decimal(11,8)
+  accuracy_m  Float?
+  source      String   @default("auto")
+  payment_id  String?
+  recorded_at DateTime @default(now())
+  staff       Staff    @relation(fields: [staff_id], references: [id])
+  branch      Branch   @relation(fields: [branch_id], references: [id])
+  @@index([staff_id, recorded_at])
+  @@index([branch_id, recorded_at])
+  @@map("staff_gps_logs")
+}
+
+// ─── OPERATOR TRACKING ───────────────────────────────────────
+
+model OperatorShift {
+  id              String    @id @default(uuid())
+  staff_id        String
+  generator_id    String
+  branch_id       String
+  tenant_id       String
+  shift_date      DateTime  @db.Date
+  check_in_at     DateTime?
+  check_in_lat    Decimal?  @db.Decimal(10,8)
+  check_in_lng    Decimal?  @db.Decimal(11,8)
+  check_in_selfie String?
+  check_in_valid  Boolean   @default(false)
+  check_out_at    DateTime?
+  check_out_lat   Decimal?  @db.Decimal(10,8)
+  check_out_lng   Decimal?  @db.Decimal(11,8)
+  check_out_selfie String?
+  hours_worked    Decimal?  @db.Decimal(5,2)
+  status          String    @default("expected")
+  notes           String?
+  created_at      DateTime  @default(now())
+  staff           Staff     @relation(fields: [staff_id], references: [id])
+  generator       Generator @relation(fields: [generator_id], references: [id])
+  branch          Branch    @relation(fields: [branch_id], references: [id])
+  @@unique([staff_id, shift_date])
+  @@index([generator_id, shift_date])
+  @@map("operator_shifts")
+}
+
+model OperatorSchedule {
+  id           String   @id @default(uuid())
+  staff_id     String
+  generator_id String
+  branch_id    String
+  tenant_id    String
+  day_of_week  Int
+  shift_start  String
+  shift_end    String
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  staff        Staff    @relation(fields: [staff_id], references: [id])
+  generator    Generator @relation(fields: [generator_id], references: [id])
+  @@index([generator_id, day_of_week])
+  @@map("operator_schedules")
+}
+
+model OperatorPermission {
+  id                     String   @id @default(uuid())
+  staff_id               String   @unique
+  tenant_id              String
+  can_log_hours          Boolean  @default(true)
+  can_add_fuel           Boolean  @default(true)
+  can_toggle_generator   Boolean  @default(false)
+  can_manual_mode        Boolean  @default(false)
+  can_view_iot           Boolean  @default(true)
+  can_add_expense        Boolean  @default(false)
+  require_shift_checkin  Boolean  @default(true)
+  geofence_radius_m      Int      @default(500)
+  shift_start_time       String?
+  shift_end_time         String?
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+  staff                  Staff    @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+  @@map("operator_permissions")
+}
+
+// ─── DISCOUNTS ───────────────────────────────────────────────
+
+model SubscriberDiscount {
+  id              String   @id @default(uuid())
+  subscriber_id   String?
+  branch_id       String
+  tenant_id       String
+  discount_type   String
+  discount_value  Decimal  @db.Decimal(10,2)
+  reason          String?
+  is_active       Boolean  @default(true)
+  valid_from      DateTime @default(now())
+  valid_until     DateTime?
+  applied_by      String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  subscriber      Subscriber? @relation(fields: [subscriber_id], references: [id])
+  branch          Branch   @relation(fields: [branch_id], references: [id])
+  @@index([branch_id, is_active])
+  @@index([subscriber_id, is_active])
+  @@map("subscriber_discounts")
+}
+
+model TenantDiscount {
+  id              String   @id @default(uuid())
+  tenant_id       String
+  discount_type   String
+  discount_value  Decimal  @db.Decimal(10,2)
+  promo_code      String?
+  reason          String?
+  is_active       Boolean  @default(true)
+  valid_from      DateTime @default(now())
+  valid_until     DateTime?
+  applied_by      String
+  auto_renew      Boolean  @default(false)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  tenant          Tenant   @relation(fields: [tenant_id], references: [id])
+  @@index([tenant_id, is_active])
+  @@index([promo_code])
+  @@map("tenant_discounts")
+}
+
+model CollectorDiscountRequest {
+  id              String    @id @default(uuid())
+  staff_id        String
+  subscriber_id   String
+  invoice_id      String?
+  branch_id       String
+  tenant_id       String
+  amount          Decimal   @db.Decimal(12,2)
+  reason          String?
+  status          String    @default("pending")
+  decided_by      String?
+  decided_at      DateTime?
+  decision_note   String?
+  expires_at      DateTime
+  notified_owner  Boolean   @default(false)
+  discount_id     String?
+  created_at      DateTime  @default(now())
+  staff           Staff     @relation(fields: [staff_id], references: [id])
+  subscriber      Subscriber @relation(fields: [subscriber_id], references: [id])
+  branch          Branch    @relation(fields: [branch_id], references: [id])
+  @@index([branch_id, status])
+  @@index([staff_id, created_at])
+  @@map("collector_discount_requests")
+}
+
+// ─── AI REPORTS ──────────────────────────────────────────────
+
+model AiReport {
+  id           String   @id @default(uuid())
+  branch_id    String
+  tenant_id    String
+  month        Int
+  year         Int
+  content_ar   String
+  prompt_used  String?
+  tokens_used  Int?
+  generated_at DateTime @default(now())
+  branch       Branch   @relation(fields: [branch_id], references: [id])
+  @@unique([branch_id, month, year])
+  @@index([tenant_id, year])
+  @@map("ai_reports")
+}
+
+model OilPressureLog {
+  id           String   @id @default(uuid())
+  engine_id    String
+  branch_id    String
+  pressure_bar Decimal  @db.Decimal(5,2)
+  source       String   @default("manual")
+  notes        String?
+  logged_at    DateTime @default(now())
+  @@index([engine_id, logged_at])
+  @@map("oil_pressure_logs")
+}
+
+model LoadLog {
+  id               String   @id @default(uuid())
+  engine_id        String
+  branch_id        String
+  load_ampere      Decimal  @db.Decimal(8,2)
+  gold_current_a   Decimal? @db.Decimal(8,2)
+  normal_current_a Decimal? @db.Decimal(8,2)
+  source           String   @default("manual")
+  logged_at        DateTime @default(now())
+  @@index([engine_id, logged_at])
+  @@map("load_logs")
+}
