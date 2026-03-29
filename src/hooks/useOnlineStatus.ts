@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import toast from "react-hot-toast";
 import { syncPendingPayments } from "@/lib/sync";
-import { getPendingCount } from "@/lib/offline";
+import { getPendingCount, cacheSubscribers } from "@/lib/offline";
 
 export function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState(true);
@@ -23,10 +24,25 @@ export function useOnlineStatus() {
 
     const handleOnline = async () => {
       setIsOnline(true);
+      toast.success("تم استعادة الاتصال");
+
+      // Sync pending payments
       const result = await syncPendingPayments();
       if (result.synced > 0) {
-        // Trigger refresh of pending count
+        toast.success(`تم رفع ${result.synced} دفعة`);
         await refreshPendingCount();
+      }
+
+      // Refresh subscriber cache
+      try {
+        const res = await fetch("/api/subscribers");
+        const data = await res.json();
+        const subs = data.subscribers ?? data;
+        if (Array.isArray(subs) && subs.length > 0) {
+          await cacheSubscribers(subs);
+        }
+      } catch {
+        // Failed to refresh — keep cached data
       }
     };
 

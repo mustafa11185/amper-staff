@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import SessionWrapper from "@/components/SessionWrapper";
 import OfflineBanner from "@/components/OfflineBanner";
+import InstallPrompt from "@/components/InstallPrompt";
 import BottomNav from "@/components/BottomNav";
 import AmperLogo from "@/components/AmperLogo";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -76,6 +77,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
       <OfflineBanner isOnline={isOnline} pendingCount={pendingCount} />
+      <InstallPrompt />
       {/* Top bar with bell */}
       {role && (
         <div className="max-w-[390px] w-full mx-auto flex items-center justify-between px-4 py-2">
