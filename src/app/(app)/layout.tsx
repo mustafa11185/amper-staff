@@ -9,6 +9,7 @@ import { Bell } from "lucide-react";
 import SessionWrapper from "@/components/SessionWrapper";
 import OfflineBanner from "@/components/OfflineBanner";
 import BottomNav from "@/components/BottomNav";
+import AmperLogo from "@/components/AmperLogo";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useGpsTracker } from "@/hooks/useGpsTracker";
 import { syncPendingPayments } from "@/lib/sync";
@@ -78,9 +79,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
       {/* Top bar with bell */}
       {role && (
         <div className="max-w-[390px] w-full mx-auto flex items-center justify-between px-4 py-2">
-          <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-            مرحباً {user?.name?.split(" ")[0] || ""}
-          </p>
+          <div className="flex items-center gap-2">
+            <AmperLogo size={24} />
+            <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+              مرحباً {user?.name?.split(" ")[0] || ""}
+            </p>
+          </div>
           <Link href="/notifications" className="relative p-2">
             <Bell className="w-5 h-5" style={{ color: "var(--text-muted)" }} />
             {notifCount > 0 && (

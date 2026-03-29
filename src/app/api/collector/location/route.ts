@@ -3,7 +3,7 @@ import { requireStaff } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 
 const STOP_DISTANCE_M = 50;
-const STOP_THRESHOLD_MIN = 3;
+const STOP_THRESHOLD_MIN = 4;
 
 function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
