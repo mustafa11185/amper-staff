@@ -1,5 +1,5 @@
 "use client";
-
+import { Suspense } from 'react'
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -53,7 +53,7 @@ type Step = "search" | "amount" | "success";
 
 const fmt = (n: number) => Number(n).toLocaleString("en");
 
-export default function POSPage() {
+function POSPageContent() {
   const { data: session } = useSession();
   const user = session?.user as any;
   const router = useRouter();
@@ -119,9 +119,9 @@ export default function POSPage() {
                 setGeofenceWarning({ distance: data.distance, radius: data.radius })
               }
             }
-          } catch {}
+          } catch { }
         },
-        () => {},
+        () => { },
         { enableHighAccuracy: true }
       )
     }
@@ -238,7 +238,7 @@ export default function POSPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subscriber_id: selected.id, amount: val, reason: discountReason || undefined }),
-    }).catch(() => {});
+    }).catch(() => { });
     setShowDiscount(false);
     setDiscountInput("");
     setDiscountReason("");
@@ -641,29 +641,29 @@ export default function POSPage() {
             </button>
             <div className="flex gap-2">
               <button onClick={async () => {
-                  if (!selected || numAmount <= 0) return;
-                  setSubmitting(true);
-                  try {
-                    const res = await fetch('/api/pos/payment-init', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        subscriber_id: selected.id,
-                        invoice_id: selected.current_invoice?.id || null,
-                        amount: numAmount,
-                      }),
-                    });
-                    const data = await res.json();
-                    if (data.payment_url) {
-                      window.location.href = data.payment_url;
-                    } else {
-                      toast.error(data.error || 'فشل إنشاء رابط الدفع');
-                    }
-                  } catch {
-                    toast.error('خطأ في الاتصال');
+                if (!selected || numAmount <= 0) return;
+                setSubmitting(true);
+                try {
+                  const res = await fetch('/api/pos/payment-init', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      subscriber_id: selected.id,
+                      invoice_id: selected.current_invoice?.id || null,
+                      amount: numAmount,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (data.payment_url) {
+                    window.location.href = data.payment_url;
+                  } else {
+                    toast.error(data.error || 'فشل إنشاء رابط الدفع');
                   }
-                  setSubmitting(false);
-                }}
+                } catch {
+                  toast.error('خطأ في الاتصال');
+                }
+                setSubmitting(false);
+              }}
                 disabled={submitting || numAmount <= 0}
                 className="w-full h-11 rounded-xl flex items-center justify-center gap-1.5 text-white font-medium text-xs disabled:opacity-40"
                 style={{ background: "#2B3990" }}>
@@ -779,3 +779,4 @@ export default function POSPage() {
 
   return null;
 }
+export default function POSPage() { return <Suspense fallback={null}><POSPageContent /></Suspense> }

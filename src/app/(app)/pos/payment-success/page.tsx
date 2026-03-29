@@ -1,9 +1,10 @@
 'use client'
+import { Suspense } from 'react'
 
 import { useSearchParams, useRouter } from 'next/navigation'
 import { CheckCircle2 } from 'lucide-react'
 
-export default function PaymentSuccessPage() {
+function Content() {
   const params = useSearchParams()
   const router = useRouter()
   const subscriberId = params?.get('subscriber') || ''
@@ -27,3 +28,4 @@ export default function PaymentSuccessPage() {
     </div>
   )
 }
+export default function Page() { return <Suspense fallback={null}><Content /></Suspense> }
