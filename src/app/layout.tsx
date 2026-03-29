@@ -29,6 +29,9 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap"
           rel="stylesheet"
         />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <meta name="theme-color" content="#1B4FD8" />
       </head>
       <body className="min-h-full flex flex-col" style={{ background: "var(--bg-base)" }}>
         {children}

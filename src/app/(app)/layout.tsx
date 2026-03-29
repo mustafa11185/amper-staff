@@ -10,6 +10,7 @@ import SessionWrapper from "@/components/SessionWrapper";
 import OfflineBanner from "@/components/OfflineBanner";
 import BottomNav from "@/components/BottomNav";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useGpsTracker } from "@/hooks/useGpsTracker";
 import { syncPendingPayments } from "@/lib/sync";
 import { cacheSubscribers } from "@/lib/offline";
 
@@ -21,6 +22,9 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const isDualRole = user?.isDualRole === true;
   const canCollect = user?.canCollect === true;
   const [notifCount, setNotifCount] = useState(0);
+
+  // GPS tracking for collectors — sends position every 1 minute
+  useGpsTracker(role, authStatus === "authenticated");
 
   useEffect(() => {
     async function initApp() {

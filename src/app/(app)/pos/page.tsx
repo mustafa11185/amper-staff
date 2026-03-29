@@ -201,8 +201,9 @@ function POSPageContent() {
   }, [subscribers, query, typeFilter, alleyFilter, unpaidOnly]);
 
   const monthlyDue = selected?.current_invoice
-    ? selected.current_invoice.total_amount_due - selected.current_invoice.amount_paid
+    ? (selected.current_invoice as any).remaining ?? (selected.current_invoice.total_amount_due - selected.current_invoice.amount_paid)
     : 0;
+  const noInvoice = selected && !selected.current_invoice;
 
   function selectSubscriber(sub: Subscriber, forceType?: "debt") {
     if (submitting) return; // Fix 5: block during payment
@@ -526,6 +527,13 @@ function POSPageContent() {
           className="text-sm flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
           <ChevronRight className="w-3.5 h-3.5" /> رجوع
         </button>
+
+        {/* No invoice warning */}
+        {noInvoice && monthlyDue === 0 && (
+          <div className="rounded-2xl p-3 text-center" style={{ background: "#FFFBEB", border: "1px solid #FDE68A" }}>
+            <p className="text-xs font-bold" style={{ color: "#92400E" }}>لا توجد فاتورة — قم بإصدار الفواتير أولاً</p>
+          </div>
+        )}
 
         {/* Amount at TOP */}
         <div className="rounded-2xl p-4" style={{ background: "var(--bg-surface)", boxShadow: "var(--shadow-md)" }}>

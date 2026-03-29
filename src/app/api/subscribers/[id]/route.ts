@@ -50,6 +50,7 @@ export async function GET(
               id: invoice.id,
               total_amount_due: Number(invoice.total_amount_due),
               amount_paid: Number(invoice.amount_paid),
+              remaining: Math.max(0, Number(invoice.total_amount_due) - Number(invoice.amount_paid)),
               is_fully_paid: invoice.is_fully_paid,
               billing_month: invoice.billing_month,
               billing_year: invoice.billing_year,
