@@ -282,6 +282,7 @@ model Branch {
   subscriber_discounts SubscriberDiscount[]
   collector_discount_requests CollectorDiscountRequest[]
   alleys             Alley[]
+  invoice_generation_logs InvoiceGenerationLog[]
   @@index([tenant_id, is_active])
   @@map("branches")
 }
@@ -440,6 +441,23 @@ model Invoice {
   @@map("invoices")
 }
 
+model InvoiceGenerationLog {
+  id            String    @id @default(uuid())
+  branch_id     String
+  tenant_id     String
+  generated_at  DateTime  @default(now())
+  invoice_count Int
+  debt_count    Int       @default(0)
+  generated_by  String
+  billing_month Int
+  billing_year  Int
+  is_reversed   Boolean   @default(false)
+  reversed_at   DateTime?
+  branch        Branch    @relation(fields: [branch_id], references: [id])
+  @@index([branch_id, generated_at])
+  @@map("invoice_generation_logs")
+}
+
 model MeterReading {
   id            String   @id @default(uuid())
   subscriber_id String
@@ -491,9 +509,24 @@ model Staff {
   collector_permission  CollectorPermission?
   gps_logs              StaffGpsLog[]
   discount_requests     CollectorDiscountRequest[]
+  devices               StaffDevice[]
   @@unique([phone, tenant_id])
   @@index([branch_id, role])
   @@map("staff")
+}
+
+model StaffDevice {
+  id         String   @id @default(uuid())
+  staff_id   String
+  fcm_token  String
+  platform   String   @default("android")
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  staff      Staff    @relation(fields: [staff_id], references: [id])
+  @@unique([staff_id, fcm_token])
+  @@index([staff_id])
+  @@map("staff_devices")
 }
 
 model StaffBranchAccess {
