@@ -94,6 +94,7 @@ model Tenant {
   pos_devices           PosDevice[]
   discounts             TenantDiscount[]
   staff_salaries        StaffSalary[]
+  staff_salary_configs  StaffSalaryConfig[]
   salary_payments       SalaryPayment[]
   @@map("tenants")
 }
@@ -513,6 +514,7 @@ model Staff {
   discount_requests     CollectorDiscountRequest[]
   devices               StaffDevice[]
   salary                StaffSalary?
+  salary_config         StaffSalaryConfig?
   salary_payments       SalaryPayment[]
   @@unique([phone, tenant_id])
   @@index([branch_id, role])
@@ -1208,6 +1210,20 @@ model StaffSalary {
   staff           Staff    @relation(fields: [staff_id], references: [id], onDelete: Cascade)
   tenant          Tenant   @relation(fields: [tenant_id], references: [id])
   @@map("staff_salaries")
+}
+
+model StaffSalaryConfig {
+  id              String   @id @default(uuid())
+  staff_id        String   @unique
+  tenant_id       String
+  branch_id       String
+  monthly_amount  Decimal  @default(0) @db.Decimal(12,2)
+  notes           String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  staff           Staff    @relation(fields: [staff_id], references: [id], onDelete: Cascade)
+  tenant          Tenant   @relation(fields: [tenant_id], references: [id])
+  @@map("staff_salary_configs")
 }
 
 model SalaryPayment {
